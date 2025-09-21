@@ -3,6 +3,7 @@ import { Calendar } from './calendar.js';
 
 const state = { events: [], models: [], editingId: null, month: new Date().toISOString().slice(0,7) };
 
+// DOM Elements
 const todayText = document.getElementById('todayText');
 const addEventBtn = document.getElementById('addEventBtn');
 const addModelBtn = document.getElementById('addModelBtn');
@@ -28,6 +29,7 @@ const legend = document.getElementById('legend');
 const tz = 'Asia/Bangkok';
 function fmtDate(s){ return s? new Date(s+'T00:00:00').toLocaleDateString('th-TH',{timeZone:tz,year:'numeric',month:'short',day:'numeric'}):''; }
 
+// ---------- INIT ----------
 async function init() {
   todayText.textContent = new Date().toLocaleString('th-TH',{timeZone:tz,weekday:'long',year:'numeric',month:'long',day:'numeric'});
   await reloadAll();
@@ -44,10 +46,13 @@ async function reloadAll() {
 }
 
 function normalizeEvent(e){
-  return { ...e, paidDeposit: e.paidDeposit===true || e.paidDeposit==='true' || e.paidDeposit==='on',
-                paidFull: e.paidFull===true || e.paidFull==='true' || e.paidFull==='on' };
+  return { ...e, 
+    paidDeposit: e.paidDeposit===true || e.paidDeposit==='true' || e.paidDeposit==='on',
+    paidFull: e.paidFull===true || e.paidFull==='true' || e.paidFull==='on' 
+  };
 }
 
+// ---------- EVENTS ----------
 function bindEvents() {
   addEventBtn.onclick = () => openEventDialog();
   addModelBtn.onclick = () => openModelDialog();
@@ -62,6 +67,7 @@ function bindEvents() {
   nextMonthBtn.onclick = () => { state.month = Calendar.shiftMonth(state.month, 1); renderCalendar(); };
 }
 
+// ---------- RENDER ----------
 function render() {
   const q = searchInput.value?.toLowerCase() || '';
   const filtered = state.events.filter(e => !q || [e.eventName,e.location,e.staff,e.model].some(s => (s||'').toLowerCase().includes(q)));
@@ -101,6 +107,7 @@ function renderModelsToSelect() {
   legend.innerHTML = state.models.map(m => `<span class="text-xs px-2 py-1 rounded-full" style="background:${m.colorBG};color:${m.colorText}">${m.name}</span>`).join(' ');
 }
 
+// ---------- DIALOG ----------
 function openEventDialog(id=null) {
   state.editingId = id;
   eventForm.reset();
@@ -114,14 +121,23 @@ function openEventDialog(id=null) {
       else eventForm[k].value = v ?? '';
     });
   }
-  eventDialog.showModal();
+  if (typeof eventDialog.showModal === "function") {
+    eventDialog.showModal();
+  } else {
+    eventDialog.setAttribute("open","true"); // fallback
+  }
 }
 
 function openModelDialog() {
   modelForm.reset();
-  modelDialog.showModal();
+  if (typeof modelDialog.showModal === "function") {
+    modelDialog.showModal();
+  } else {
+    modelDialog.setAttribute("open","true"); // fallback
+  }
 }
 
+// ---------- CRUD ----------
 async function onSaveEvent(ev) {
   ev.preventDefault();
   const fd = new FormData(eventForm);
@@ -152,6 +168,7 @@ async function onSaveModel(ev) {
   modelDialog.close();
 }
 
+// ---------- CALENDAR ----------
 function renderCalendar(){
   const m = state.month;
   const { weeks, label } = Calendar.build(m);
@@ -161,20 +178,4 @@ function renderCalendar(){
     <div class="contents">
       ${week.map(day => day? calendarCell(day, map[day] || []): calendarCell('', [] , true)).join('')}
     </div>
-  `).join('');
-}
-
-function calendarCell(dateStr, events, muted=false){
-  const dayNum = dateStr? Number(dateStr.split('-')[2]) : '';
-  const items = events.map(e => {
-    const m = state.models.find(x=>x.name===e.model);
-    const bg = m?.colorBG || '#222'; const fg = m?.colorText || '#fff';
-    return `<div class="truncate text-[11px] px-2 py-1 rounded mb-1" style="background:${bg};color:${fg}" title="${e.eventName}">${e.eventName}</div>`;
-  }).join('');
-  return `<div class="h-28 border border-neutral-800 rounded-lg p-2 ${muted?'opacity-30':''}">
-    <div class="text-xs text-neutral-400 mb-1">${dayNum}</div>
-    <div>${items}</div>
-  </div>`;
-}
-
-init();
+  `).join('
