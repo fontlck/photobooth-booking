@@ -1,7 +1,12 @@
 import { API } from './api.js';
 import { Calendar } from './calendar.js';
 
-const state = { events: [], models: [], editingId: null, month: new Date().toISOString().slice(0,7) };
+const state = { 
+  events: [], 
+  models: [], 
+  editingId: null, 
+  month: new Date().toISOString().slice(0,7) // YYYY-MM
+};
 
 // DOM Elements
 const todayText = document.getElementById('todayText');
@@ -27,13 +32,25 @@ const calendarGrid = document.getElementById('calendarGrid');
 const legend = document.getElementById('legend');
 
 const tz = 'Asia/Bangkok';
-function fmtDate(s){ return s? new Date(s+'T00:00:00').toLocaleDateString('th-TH',{timeZone:tz,year:'numeric',month:'short',day:'numeric'}):''; }
+function fmtDate(s){ 
+  return s? new Date(s+'T00:00:00').toLocaleDateString('th-TH',
+    {timeZone:tz,year:'numeric',month:'short',day:'numeric'}):''; 
+}
 
 // ---------- INIT ----------
 async function init() {
-  todayText.textContent = new Date().toLocaleString('th-TH',{timeZone:tz,weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  await reloadAll();
+  todayText.textContent = new Date().toLocaleString('th-TH',{
+    timeZone:tz,weekday:'long',year:'numeric',month:'long',day:'numeric'
+  });
+
+  try {
+    await reloadAll();
+  } catch (err) {
+    console.error("โหลดข้อมูลจาก API ไม่สำเร็จ:", err);
+  }
+
   bindEvents();
+  renderCalendar(); // ให้ปฏิทินแสดงแน่นอน
 }
 
 async function reloadAll() {
@@ -63,14 +80,25 @@ function bindEvents() {
   deleteEventBtn.onclick = onDeleteEvent;
   searchInput.oninput = render;
 
-  prevMonthBtn.onclick = () => { state.month = Calendar.shiftMonth(state.month, -1); renderCalendar(); };
-  nextMonthBtn.onclick = () => { state.month = Calendar.shiftMonth(state.month, 1); renderCalendar(); };
+  prevMonthBtn.onclick = () => { 
+    state.month = Calendar.shiftMonth(state.month, -1); 
+    renderCalendar(); 
+  };
+  nextMonthBtn.onclick = () => { 
+    state.month = Calendar.shiftMonth(state.month, 1); 
+    renderCalendar(); 
+  };
 }
 
 // ---------- RENDER ----------
 function render() {
   const q = searchInput.value?.toLowerCase() || '';
-  const filtered = state.events.filter(e => !q || [e.eventName,e.location,e.staff,e.model].some(s => (s||'').toLowerCase().includes(q)));
+  const filtered = state.events.filter(e => 
+    !q || [e.eventName,e.location,e.staff,e.model]
+      .some(s => (s||'').toLowerCase().includes(q))
+  );
+
+  // render table
   tbody.innerHTML = filtered.map(e => `
     <tr class="hover:bg-neutral-800 cursor-pointer" data-id="${e.id}">
       <td>${fmtDate(e.startDate)}${e.endDate? ' – '+fmtDate(e.endDate): ''}</td>
@@ -80,21 +108,32 @@ function render() {
       <td>${[e.openTime,e.closeTime].filter(Boolean).join(' - ')}</td>
       <td>${e.price||''}</td>
       <td>${e.paidDeposit?'มัดจำ':''} ${e.paidFull?'ชำระครบ':''}</td>
-      <td><button data-id="${e.id}" data-action="edit" class="px-2 py-1 text-xs bg-neutral-700 rounded">แก้ไข</button></td>
+      <td><button data-id="${e.id}" data-action="edit" 
+        class="px-2 py-1 text-xs bg-neutral-700 rounded">แก้ไข</button></td>
     </tr>
   `).join('');
 
-  tbody.querySelectorAll('button[data-action="edit"]').forEach(btn => btn.onclick = () => openEventDialog(btn.dataset.id));
+  tbody.querySelectorAll('button[data-action="edit"]').forEach(btn => 
+    btn.onclick = () => openEventDialog(btn.dataset.id)
+  );
 
+  // render upcoming (5)
   const today = new Date().toISOString().slice(0,10);
-  const upcoming = [...state.events].filter(e => (e.startDate||'') >= today).sort((a,b)=>a.startDate.localeCompare(b.startDate)).slice(0,5);
+  const upcoming = [...state.events]
+    .filter(e => (e.startDate||'') >= today)
+    .sort((a,b)=>a.startDate.localeCompare(b.startDate))
+    .slice(0,5);
+
   upcomingList.innerHTML = upcoming.map(e => {
     const m = state.models.find(x=>x.name===e.model);
     const bg = m?.colorBG || '#222'; const fg = m?.colorText || '#fff';
     return `<div class="p-3 rounded-xl bg-neutral-950 border border-neutral-800">
       <div class="flex items-center justify-between">
-        <div class="text-sm text-neutral-400">${fmtDate(e.startDate)}${e.endDate? ' - '+fmtDate(e.endDate): ''}</div>
-        <span class="text-xs px-2 py-1 rounded-full" style="background:${bg};color:${fg}">${e.model||'-'}</span>
+        <div class="text-sm text-neutral-400">
+          ${fmtDate(e.startDate)}${e.endDate? ' - '+fmtDate(e.endDate): ''}
+        </div>
+        <span class="text-xs px-2 py-1 rounded-full" 
+          style="background:${bg};color:${fg}">${e.model||'-'}</span>
       </div>
       <div class="mt-1 font-semibold">${e.eventName||'-'}</div>
       <div class="text-sm text-neutral-300">${e.location||''}</div>
@@ -103,8 +142,15 @@ function render() {
 }
 
 function renderModelsToSelect() {
-  modelSelect.innerHTML = ['<option value=""></option>'].concat(state.models.map(m => `<option value="${m.name}">${m.name}</option>`)).join('');
-  legend.innerHTML = state.models.map(m => `<span class="text-xs px-2 py-1 rounded-full" style="background:${m.colorBG};color:${m.colorText}">${m.name}</span>`).join(' ');
+  modelSelect.innerHTML = ['<option value=""></option>']
+    .concat(state.models.map(m => 
+      `<option value="${m.name}">${m.name}</option>`
+    )).join('');
+
+  legend.innerHTML = state.models.map(m => 
+    `<span class="text-xs px-2 py-1 rounded-full" 
+      style="background:${m.colorBG};color:${m.colorText}">${m.name}</span>`
+  ).join(' ');
 }
 
 // ---------- DIALOG ----------
@@ -113,6 +159,7 @@ function openEventDialog(id=null) {
   eventForm.reset();
   deleteEventBtn.classList.toggle('hidden', !id);
   renderModelsToSelect();
+
   if (id) {
     const e = state.events.find(x=>x.id===id);
     if (e) Object.entries(e).forEach(([k,v]) => {
@@ -121,6 +168,7 @@ function openEventDialog(id=null) {
       else eventForm[k].value = v ?? '';
     });
   }
+
   if (typeof eventDialog.showModal === "function") {
     eventDialog.showModal();
   } else {
@@ -145,6 +193,7 @@ async function onSaveEvent(ev) {
   data.id = state.editingId || crypto.randomUUID();
   data.paidDeposit = fd.get('paidDeposit')==='on';
   data.paidFull = fd.get('paidFull')==='on';
+
   await API.upsert('events', data);
   await reloadAll();
   eventDialog.close();
@@ -163,6 +212,7 @@ async function onSaveModel(ev) {
   const fd = new FormData(modelForm);
   const data = Object.fromEntries(fd.entries());
   data.id = crypto.randomUUID();
+
   await API.upsert('models', data);
   await reloadAll();
   modelDialog.close();
@@ -173,9 +223,31 @@ function renderCalendar(){
   const m = state.month;
   const { weeks, label } = Calendar.build(m);
   monthLabel.textContent = label;
+
   const map = Calendar.eventsByDate(state.events);
   calendarGrid.innerHTML = weeks.map(week => `
     <div class="contents">
-      ${week.map(day => day? calendarCell(day, map[day] || []): calendarCell('', [] , true)).join('')}
+      ${week.map(day => 
+        day? calendarCell(day, map[day] || []): calendarCell('', [] , true)
+      ).join('')}
     </div>
-  `).join('
+  `).join('');
+}
+
+function calendarCell(dateStr, events, muted=false){
+  const dayNum = dateStr? Number(dateStr.split('-')[2]) : '';
+  const items = events.map(e => {
+    const m = state.models.find(x=>x.name===e.model);
+    const bg = m?.colorBG || '#222'; const fg = m?.colorText || '#fff';
+    return `<div class="truncate text-[11px] px-2 py-1 rounded mb-1" 
+              style="background:${bg};color:${fg}" 
+              title="${e.eventName}">${e.eventName}</div>`;
+  }).join('');
+  return `<div class="h-28 border border-neutral-800 rounded-lg p-2 ${muted?'opacity-30':''}">
+    <div class="text-xs text-neutral-400 mb-1">${dayNum}</div>
+    <div>${items}</div>
+  </div>`;
+}
+
+// ---------- START ----------
+init();
